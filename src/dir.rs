@@ -5,11 +5,11 @@ use std::fs::DirEntry;
 use std::path::Path;
 use crate::format::Formatter;
 
-struct Symbols {
-    down: &'static str,
-    tee: &'static str,
-    ell: &'static str,
-    right: &'static str,
+pub struct Symbols {
+    pub down: &'static str,
+    pub tee: &'static str,
+    pub ell: &'static str,
+    pub right: &'static str,
 }
 
 static UTF8_SYMBOLS: Symbols = Symbols {
@@ -25,7 +25,6 @@ static ASCII_SYMBOLS: Symbols = Symbols {
     ell: "`",
     right: "-",
 };
-
 pub struct Printer<'a> {
     dir: &'a Path,
     full_name: bool,
@@ -81,20 +80,7 @@ impl<'a> Printer<'a> {
         while let Some(entry) = it.next() {
             let entry = entry?;
             levels_continue.push(it.peek().is_some());
-            if let Some((last_continues, rest)) = levels_continue.split_last() {
-                for continues in rest {
-                    let c = if *continues { symbols.down } else { " " };
-                    print!("{}   ", c);
-                }
-
-                let c = if *last_continues {
-                    symbols.tee
-                } else {
-                    symbols.ell
-                };
-                print!("{0}{1}{1} ", c, symbols.right);
-            }
-            println!("{}", Formatter::new(self.full_name, &entry));
+            println!("{}", Formatter::new(self.full_name, levels_continue, &symbols, &entry));
             if entry.file_type()?.is_dir() {
                 self.print_file(entry.path().as_path(), symbols, levels_continue)?;
             }
@@ -102,7 +88,6 @@ impl<'a> Printer<'a> {
         }
         Ok(())
     }
-
 }
 
 fn is_hidden(entry: &DirEntry) -> bool {
