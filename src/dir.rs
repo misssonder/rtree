@@ -25,15 +25,22 @@ static ASCII_SYMBOLS: Symbols = Symbols {
     ell: "`",
     right: "-",
 };
+
 pub struct Printer<'a> {
     dir: &'a Path,
     full_name: bool,
-    all: bool,
-    dir_only: bool,
     charset: Charset,
     sorter: Option<
         Box<
             dyn FnMut(&DirEntry, &DirEntry) -> Ordering
+            + Send
+            + Sync
+            + 'static,
+        >,
+    >,
+    filter: Option<
+        Box<
+            dyn FnMut(&DirEntry) -> bool
             + Send
             + Sync
             + 'static,
@@ -46,10 +53,9 @@ impl<'a> Printer<'a> {
         Printer {
             dir: args.dir(),
             full_name: args.full,
-            all: args.all,
-            dir_only: args.direction_only,
             charset: args.charset.clone(),
             sorter: None,
+            filter: Self::build_filter(args.all, args.direction_only),
         }
     }
     pub fn print(&mut self) -> Result<(), anyhow::Error> {
@@ -67,7 +73,16 @@ impl<'a> Printer<'a> {
         levels_continue: &mut Vec<bool>,
     ) -> Result<(), anyhow::Error> {
         let dir = fs::read_dir(path)?;
-        let mut entries: Vec<_> = dir.collect();
+        let mut entries: Vec<_> = if let Some(ref mut filter) = self.filter {
+            dir.filter(|e| {
+                match e {
+                    Ok(entry) => filter(entry),
+                    Err(_) => true,
+                }
+            }).collect()
+        } else {
+            dir.collect()
+        };
         if let Some(ref mut cmp) = self.sorter {
             entries.sort_by(|a, b| match (a, b) {
                 (Ok(a), Ok(b)) => cmp(a, b),
@@ -87,6 +102,26 @@ impl<'a> Printer<'a> {
             levels_continue.pop();
         }
         Ok(())
+    }
+
+    fn build_filter(all: bool, dir_only: bool) -> Option<Box<
+        dyn FnMut(&DirEntry) -> bool
+        + Send
+        + Sync
+        + 'static,
+    >> {
+        if all {
+            return None;
+        }
+        if dir_only {
+            return Some(Box::new(|e| {
+                if let Ok(file_type) = e.file_type() {
+                    return file_type.is_dir();
+                }
+                false
+            }));
+        }
+        Some(Box::new(|e| { !is_hidden(e) }))
     }
 }
 
