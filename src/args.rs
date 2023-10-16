@@ -5,9 +5,12 @@ use std::path::{Path, PathBuf};
 pub struct Context {
     /// Directory to list; defaults to current working directory.
     pub dir: Option<PathBuf>,
-    #[arg(long = "charset", value_enum, default_value_t = Charset::Utf8)]
-    /// Character set to use in output: utf8, ascii.
+    #[arg(long = "charset", short, value_enum, default_value_t = Charset::Utf8)]
+    /// Character set to use in output
     pub charset: Charset,
+    #[arg(long, short, value_enum, default_value_t = SortArgs::Filename)]
+    /// Sorting options
+    pub sort: SortArgs,
     #[arg(long = "all", short)]
     /// All files are listed.
     pub all: bool,
@@ -23,6 +26,12 @@ pub struct Context {
 pub enum Charset {
     Utf8,
     Ascii,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum SortArgs {
+    Filename,
+    Size,
 }
 
 impl Context {

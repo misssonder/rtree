@@ -1,7 +1,8 @@
-use crate::args::{Charset, Context};
+use crate::args::{Charset, Context, SortArgs};
 use std::cmp::Ordering;
 use std::fs;
 use std::fs::DirEntry;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use crate::format::Formatter;
 
@@ -57,7 +58,7 @@ impl<'a> Printer<'a> {
             dir: args.dir(),
             full_name: args.full,
             charset: args.charset.clone(),
-            sorter: Self::build_sorter(),
+            sorter: Self::build_sorter(&args.sort),
             filter: Self::build_filter(args.all, args.direction_only),
         }
     }
@@ -114,7 +115,7 @@ impl<'a> Printer<'a> {
         if dir_only {
             return Some(Box::new(|e| {
                 if let Ok(file_type) = e.file_type() {
-                    return file_type.is_dir()&&!is_hidden(e);
+                    return file_type.is_dir() && !is_hidden(e);
                 }
                 false
             }));
@@ -122,10 +123,23 @@ impl<'a> Printer<'a> {
         Some(Box::new(|e| { !is_hidden(e) }))
     }
 
-    fn build_sorter() -> Sorter{
-        Some(Box::new(|a,b|{
-            a.file_name().cmp(&b.file_name())
-        }))
+    fn build_sorter(sort_args: &SortArgs) -> Sorter {
+        match sort_args {
+            SortArgs::Filename =>
+                Some(Box::new(|a, b| {
+                    a.file_name().cmp(&b.file_name())
+                })),
+            SortArgs::Size => {
+                Some(Box::new(|a, b| {
+                    match (a.metadata(), b.metadata()) {
+                        (Ok(a), Ok(b)) => a.size().cmp(&b.size()),
+                        (Err(_), Err(_)) => Ordering::Equal,
+                        (Ok(_), Err(_)) => Ordering::Greater,
+                        (Err(_), Ok(_)) => Ordering::Less,
+                    }
+                }))
+            }
+        }
     }
 }
 
