@@ -139,6 +139,26 @@ impl<'a> Printer<'a> {
                     }
                 }))
             }
+            SortArgs::CreatedTime => {
+                Some(Box::new(|a, b| {
+                    match (a.metadata(), b.metadata()) {
+                        (Ok(a), Ok(b)) => a.created().unwrap().cmp(&b.created().unwrap()),
+                        (Err(_), Err(_)) => Ordering::Equal,
+                        (Ok(_), Err(_)) => Ordering::Greater,
+                        (Err(_), Ok(_)) => Ordering::Less,
+                    }
+                }))
+            }
+            SortArgs::ModifiedTime => {
+                Some(Box::new(|a, b| {
+                    match (a.metadata(), b.metadata()) {
+                        (Ok(a), Ok(b)) => a.modified().unwrap().cmp(&b.modified().unwrap()),
+                        (Err(_), Err(_)) => Ordering::Equal,
+                        (Ok(_), Err(_)) => Ordering::Greater,
+                        (Err(_), Ok(_)) => Ordering::Less,
+                    }
+                }))
+            }
         }
     }
 }

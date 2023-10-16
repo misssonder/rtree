@@ -32,6 +32,8 @@ pub enum Charset {
 pub enum SortArgs {
     Filename,
     Size,
+    CreatedTime,
+    ModifiedTime,
 }
 
 impl Context {
