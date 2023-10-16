@@ -26,26 +26,29 @@ static ASCII_SYMBOLS: Symbols = Symbols {
     right: "-",
 };
 
+type Sorter = Option<
+    Box<
+        dyn FnMut(&DirEntry, &DirEntry) -> Ordering
+        + Send
+        + Sync
+        + 'static,
+    >,
+>;
+type Filter = Option<
+    Box<
+        dyn FnMut(&DirEntry) -> bool
+        + Send
+        + Sync
+        + 'static,
+    >,
+>;
+
 pub struct Printer<'a> {
     dir: &'a Path,
     full_name: bool,
     charset: Charset,
-    sorter: Option<
-        Box<
-            dyn FnMut(&DirEntry, &DirEntry) -> Ordering
-            + Send
-            + Sync
-            + 'static,
-        >,
-    >,
-    filter: Option<
-        Box<
-            dyn FnMut(&DirEntry) -> bool
-            + Send
-            + Sync
-            + 'static,
-        >,
-    >,
+    sorter: Sorter,
+    filter: Filter,
 }
 
 impl<'a> Printer<'a> {
@@ -54,7 +57,7 @@ impl<'a> Printer<'a> {
             dir: args.dir(),
             full_name: args.full,
             charset: args.charset.clone(),
-            sorter: None,
+            sorter: Self::build_sorter(),
             filter: Self::build_filter(args.all, args.direction_only),
         }
     }
@@ -95,7 +98,7 @@ impl<'a> Printer<'a> {
         while let Some(entry) = it.next() {
             let entry = entry?;
             levels_continue.push(it.peek().is_some());
-            println!("{}", Formatter::new(self.full_name, levels_continue, &symbols, &entry));
+            println!("{}", Formatter::new(self.full_name, levels_continue, symbols, &entry));
             if entry.file_type()?.is_dir() {
                 self.print_file(entry.path().as_path(), symbols, levels_continue)?;
             }
@@ -104,24 +107,25 @@ impl<'a> Printer<'a> {
         Ok(())
     }
 
-    fn build_filter(all: bool, dir_only: bool) -> Option<Box<
-        dyn FnMut(&DirEntry) -> bool
-        + Send
-        + Sync
-        + 'static,
-    >> {
+    fn build_filter(all: bool, dir_only: bool) -> Filter {
         if all {
             return None;
         }
         if dir_only {
             return Some(Box::new(|e| {
                 if let Ok(file_type) = e.file_type() {
-                    return file_type.is_dir();
+                    return file_type.is_dir()&&!is_hidden(e);
                 }
                 false
             }));
         }
         Some(Box::new(|e| { !is_hidden(e) }))
+    }
+
+    fn build_sorter() -> Sorter{
+        Some(Box::new(|a,b|{
+            a.file_name().cmp(&b.file_name())
+        }))
     }
 }
 
