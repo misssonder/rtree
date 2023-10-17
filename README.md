@@ -21,6 +21,7 @@ Options:
 ```
 
 ```shell
+$ rtree
 .
 ├── Cargo.lock
 ├── Cargo.toml
