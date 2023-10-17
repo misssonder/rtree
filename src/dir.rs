@@ -68,6 +68,7 @@ impl<'a> Printer<'a> {
             Charset::Utf8 => &UTF8_SYMBOLS,
             Charset::Ascii => &ASCII_SYMBOLS,
         };
+        println!("{}",self.dir.to_str().unwrap_or_default());
         self.print_file(self.dir, symbols, &mut level_continues)
     }
     fn print_file<P: AsRef<Path>>(
