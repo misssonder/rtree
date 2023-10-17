@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use crate::args::Context;
 use clap::Parser;
 use crate::dir::Printer;
