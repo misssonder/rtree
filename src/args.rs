@@ -11,6 +11,9 @@ pub struct Context {
     #[arg(long, short, value_enum, default_value_t = SortArgs::Filename)]
     /// Sorting options
     pub sort: SortArgs,
+    #[arg(long, short)]
+    /// Reverse the order of the sort.
+    pub reverse:bool,
     #[arg(long = "all", short)]
     /// All files are listed.
     pub all: bool,

@@ -58,7 +58,7 @@ impl<'a> Printer<'a> {
             dir: args.dir(),
             full_name: args.full,
             charset: args.charset.clone(),
-            sorter: Self::build_sorter(&args.sort),
+            sorter: Self::build_sorter(&args.sort, args.reverse),
             filter: Self::build_filter(args.all, args.direction_only),
         }
     }
@@ -68,7 +68,7 @@ impl<'a> Printer<'a> {
             Charset::Utf8 => &UTF8_SYMBOLS,
             Charset::Ascii => &ASCII_SYMBOLS,
         };
-        println!("{}",self.dir.to_str().unwrap_or_default());
+        println!("{}", self.dir.to_str().unwrap_or_default());
         self.print_file(self.dir, symbols, &mut level_continues)
     }
     fn print_file<P: AsRef<Path>>(
@@ -124,16 +124,26 @@ impl<'a> Printer<'a> {
         Some(Box::new(|e| { !is_hidden(e) }))
     }
 
-    fn build_sorter(sort_args: &SortArgs) -> Sorter {
+    fn build_sorter(sort_args: &SortArgs, reverse: bool) -> Sorter {
         match sort_args {
             SortArgs::Filename =>
-                Some(Box::new(|a, b| {
-                    a.file_name().cmp(&b.file_name())
+                Some(Box::new(move |a, b| {
+                    if reverse {
+                        b.file_name().cmp(&a.file_name())
+                    } else {
+                        a.file_name().cmp(&b.file_name())
+                    }
                 })),
             SortArgs::Size => {
-                Some(Box::new(|a, b| {
+                Some(Box::new(move |a, b| {
                     match (a.metadata(), b.metadata()) {
-                        (Ok(a), Ok(b)) => a.size().cmp(&b.size()),
+                        (Ok(a), Ok(b)) => {
+                            if reverse {
+                                b.size().cmp(&a.size())
+                            } else {
+                                a.size().cmp(&b.size())
+                            }
+                        }
                         (Err(_), Err(_)) => Ordering::Equal,
                         (Ok(_), Err(_)) => Ordering::Greater,
                         (Err(_), Ok(_)) => Ordering::Less,
@@ -141,9 +151,15 @@ impl<'a> Printer<'a> {
                 }))
             }
             SortArgs::CreatedTime => {
-                Some(Box::new(|a, b| {
+                Some(Box::new(move |a, b| {
                     match (a.metadata(), b.metadata()) {
-                        (Ok(a), Ok(b)) => a.created().unwrap().cmp(&b.created().unwrap()),
+                        (Ok(a), Ok(b)) => {
+                            if reverse {
+                                b.created().unwrap().cmp(&a.created().unwrap())
+                            } else {
+                                a.created().unwrap().cmp(&b.created().unwrap())
+                            }
+                        }
                         (Err(_), Err(_)) => Ordering::Equal,
                         (Ok(_), Err(_)) => Ordering::Greater,
                         (Err(_), Ok(_)) => Ordering::Less,
@@ -151,9 +167,15 @@ impl<'a> Printer<'a> {
                 }))
             }
             SortArgs::ModifiedTime => {
-                Some(Box::new(|a, b| {
+                Some(Box::new(move |a, b| {
                     match (a.metadata(), b.metadata()) {
-                        (Ok(a), Ok(b)) => a.modified().unwrap().cmp(&b.modified().unwrap()),
+                        (Ok(a), Ok(b)) => {
+                            if reverse {
+                                b.modified().unwrap().cmp(&a.modified().unwrap())
+                            } else {
+                                a.modified().unwrap().cmp(&b.modified().unwrap())
+                            }
+                        }
                         (Err(_), Err(_)) => Ordering::Equal,
                         (Ok(_), Err(_)) => Ordering::Greater,
                         (Err(_), Ok(_)) => Ordering::Less,
