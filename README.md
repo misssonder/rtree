@@ -1,5 +1,9 @@
 # rtree
 **tree** command implement in rust
+## Installation
+```shell
+cargo install rtree --git https://github.com/misssonder/rtree
+```
 ## Usage
 ```shell
 Usage: rtree [OPTIONS] [DIR]
