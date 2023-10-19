@@ -13,7 +13,7 @@ pub struct Context {
     pub sort: SortArgs,
     #[arg(long, short)]
     /// Reverse the order of the sort.
-    pub reverse:bool,
+    pub reverse: bool,
     #[arg(long = "all", short)]
     /// All files are listed.
     pub all: bool,

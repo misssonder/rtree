@@ -1,10 +1,10 @@
 use crate::args::{Charset, Context, SortArgs};
+use crate::format::Formatter;
 use std::cmp::Ordering;
 use std::fs;
 use std::fs::DirEntry;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
-use crate::format::Formatter;
 
 pub struct Symbols {
     pub down: &'static str,
@@ -27,22 +27,8 @@ static ASCII_SYMBOLS: Symbols = Symbols {
     right: "-",
 };
 
-type Sorter = Option<
-    Box<
-        dyn FnMut(&DirEntry, &DirEntry) -> Ordering
-        + Send
-        + Sync
-        + 'static,
-    >,
->;
-type Filter = Option<
-    Box<
-        dyn FnMut(&DirEntry) -> bool
-        + Send
-        + Sync
-        + 'static,
-    >,
->;
+type Sorter = Option<Box<dyn FnMut(&DirEntry, &DirEntry) -> Ordering + Send + Sync + 'static>>;
+type Filter = Option<Box<dyn FnMut(&DirEntry) -> bool + Send + Sync + 'static>>;
 
 pub struct Printer<'a> {
     dir: &'a Path,
@@ -79,12 +65,11 @@ impl<'a> Printer<'a> {
     ) -> Result<(), anyhow::Error> {
         let dir = fs::read_dir(path)?;
         let mut entries: Vec<_> = if let Some(ref mut filter) = self.filter {
-            dir.filter(|e| {
-                match e {
-                    Ok(entry) => filter(entry),
-                    Err(_) => true,
-                }
-            }).collect()
+            dir.filter(|e| match e {
+                Ok(entry) => filter(entry),
+                Err(_) => true,
+            })
+            .collect()
         } else {
             dir.collect()
         };
@@ -100,7 +85,10 @@ impl<'a> Printer<'a> {
         while let Some(entry) = it.next() {
             let entry = entry?;
             levels_continue.push(it.peek().is_some());
-            println!("{}", Formatter::new(self.full_name, levels_continue, symbols, &entry));
+            println!(
+                "{}",
+                Formatter::new(self.full_name, levels_continue, symbols, &entry)
+            );
             if entry.file_type()?.is_dir() {
                 self.print_file(entry.path().as_path(), symbols, levels_continue)?;
             }
@@ -121,65 +109,56 @@ impl<'a> Printer<'a> {
                 false
             }));
         }
-        Some(Box::new(|e| { !is_hidden(e) }))
+        Some(Box::new(|e| !is_hidden(e)))
     }
 
     fn build_sorter(sort_args: &SortArgs, reverse: bool) -> Sorter {
         match sort_args {
-            SortArgs::Filename =>
-                Some(Box::new(move |a, b| {
+            SortArgs::Filename => Some(Box::new(move |a, b| {
+                if reverse {
+                    b.file_name().cmp(&a.file_name())
+                } else {
+                    a.file_name().cmp(&b.file_name())
+                }
+            })),
+            SortArgs::Size => Some(Box::new(move |a, b| match (a.metadata(), b.metadata()) {
+                (Ok(a), Ok(b)) => {
                     if reverse {
-                        b.file_name().cmp(&a.file_name())
+                        b.size().cmp(&a.size())
                     } else {
-                        a.file_name().cmp(&b.file_name())
+                        a.size().cmp(&b.size())
                     }
-                })),
-            SortArgs::Size => {
-                Some(Box::new(move |a, b| {
-                    match (a.metadata(), b.metadata()) {
-                        (Ok(a), Ok(b)) => {
-                            if reverse {
-                                b.size().cmp(&a.size())
-                            } else {
-                                a.size().cmp(&b.size())
-                            }
-                        }
-                        (Err(_), Err(_)) => Ordering::Equal,
-                        (Ok(_), Err(_)) => Ordering::Greater,
-                        (Err(_), Ok(_)) => Ordering::Less,
-                    }
-                }))
-            }
+                }
+                (Err(_), Err(_)) => Ordering::Equal,
+                (Ok(_), Err(_)) => Ordering::Greater,
+                (Err(_), Ok(_)) => Ordering::Less,
+            })),
             SortArgs::CreatedTime => {
-                Some(Box::new(move |a, b| {
-                    match (a.metadata(), b.metadata()) {
-                        (Ok(a), Ok(b)) => {
-                            if reverse {
-                                b.created().unwrap().cmp(&a.created().unwrap())
-                            } else {
-                                a.created().unwrap().cmp(&b.created().unwrap())
-                            }
+                Some(Box::new(move |a, b| match (a.metadata(), b.metadata()) {
+                    (Ok(a), Ok(b)) => {
+                        if reverse {
+                            b.created().unwrap().cmp(&a.created().unwrap())
+                        } else {
+                            a.created().unwrap().cmp(&b.created().unwrap())
                         }
-                        (Err(_), Err(_)) => Ordering::Equal,
-                        (Ok(_), Err(_)) => Ordering::Greater,
-                        (Err(_), Ok(_)) => Ordering::Less,
                     }
+                    (Err(_), Err(_)) => Ordering::Equal,
+                    (Ok(_), Err(_)) => Ordering::Greater,
+                    (Err(_), Ok(_)) => Ordering::Less,
                 }))
             }
             SortArgs::ModifiedTime => {
-                Some(Box::new(move |a, b| {
-                    match (a.metadata(), b.metadata()) {
-                        (Ok(a), Ok(b)) => {
-                            if reverse {
-                                b.modified().unwrap().cmp(&a.modified().unwrap())
-                            } else {
-                                a.modified().unwrap().cmp(&b.modified().unwrap())
-                            }
+                Some(Box::new(move |a, b| match (a.metadata(), b.metadata()) {
+                    (Ok(a), Ok(b)) => {
+                        if reverse {
+                            b.modified().unwrap().cmp(&a.modified().unwrap())
+                        } else {
+                            a.modified().unwrap().cmp(&b.modified().unwrap())
                         }
-                        (Err(_), Err(_)) => Ordering::Equal,
-                        (Ok(_), Err(_)) => Ordering::Greater,
-                        (Err(_), Ok(_)) => Ordering::Less,
                     }
+                    (Err(_), Err(_)) => Ordering::Equal,
+                    (Ok(_), Err(_)) => Ordering::Greater,
+                    (Err(_), Ok(_)) => Ordering::Less,
                 }))
             }
         }
